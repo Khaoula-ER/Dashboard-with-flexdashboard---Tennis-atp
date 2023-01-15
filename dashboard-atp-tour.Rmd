@@ -1,0 +1,254 @@
+---
+title: "ATP Tour viewed by Master SEP, prom 2023"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    css: extra.css
+    vertical_layout: scroll
+runtime: shiny
+---
+
+
+```{r include=FALSE}
+#required libraries load ----
+if (!require(flexdashboard)) { install.packages("flexdashboard"); library(flexdashboard) } 
+if (!require(shiny)) { install.packages("shiny"); library(shiny) } 
+if (!require(rlang)) { install.packages("rlang"); library(rlang) }
+if (!require(shinythemes)) { install.packages("shinythemes"); library(shinythemes) } 
+if (!require(tidyverse)) {install.packages("tidyverse"); library(tidyverse)}
+if (!require(dplyr)) { install.packages("dplyr"); library(dplyr) }
+if (!require(plotly)) { install.packages("plotly"); library(plotly) }
+if (!require(ggplot2)) { install.packages("ggplot2"); library(ggplot2) } 
+if (!require(ggthemes)) { install.packages("ggthemes"); library(ggthemes) } 
+if (!require(DT)) { install.packages("DT"); library(DT) }
+if (!require(janitor)) { install.packages("janitor"); library(janitor) } # for rownames_to_column function in Restructure_Frequent_oppo function
+if (!require(readr)) { install.packages("readr"); library(readr) } # for data_importation.R to avoid multiple loads
+if (!require(magrittr)) { install.packages("magrittr"); library(magrittr) } # for data_importation.R to avoid multiple loads
+if (!require(forcats)) { install.packages("forcats"); library(forcats) } # for fct_reorder function in most_final_appearances function
+
+
+#Required functions : out sourced extensive and simple functions
+source("R/data_wrangling.R")
+source("R/data_vizualisation.R")
+
+# data importation and preparation----
+source("R/data_importation.R")
+
+```
+
+```{css, echo=FALSE}
+.fluid-row {
+  font-size: 5.9vw;
+}
+.value-box {
+  height: 110px;
+}
+```
+
+
+```{r global, message=FALSE, warning=FALSE}
+# intialise styles for value boxes ----
+top_text_style <- 
+"position: absolute; 
+overflow: hidden; 
+left: 5%; top: 1px; 
+right: 0px; 
+bottom: 0px; width:100%;
+font-weight: 580;"
+
+bottom_text_style <- 
+"position: absolute;
+bottom: 0;
+left: 5px;
+font-weight: 600;"
+
+text_style <- 
+"position: absolute;
+bottom: 0;
+left: 5px;width:100%;
+font-weight: 580;"
+
+```
+
+# Presentation
+# Overall 1968-2022 ATP tours 
+
+
+# Men's Tennis records {data-orientation=rows}
+
+## Row 1 
+-------------------------------
+```{r}
+# To retrieve the selected Tourney value
+Tourneys_list=unique(atp$tourney_name)
+selectizeInput('tournoi',  'Please select a Tourney', Tourneys_list)
+```
+### {.value-box} 
+```{r}
+# Surface type valueBox
+renderValueBox({
+  surf_df=nb_match_surface(atp, input$tournoi)
+  list=unique(surf_df$surface)
+  
+  value=noquote(paste(list,  collapse=", "))
+  caption = tags$p("Type of Surface", style = text_style)
+  valueBox(value, icon = "fas fa-ticket-alt", color="#008B8B", caption)
+})
+```
+
+### {.value-box} 
+```{r}
+# Number of matchs played valueBox
+renderValueBox({
+  nb_match_df=nb_match_func(atp, input$tournoi)
+    
+  caption = tags$p("Number of Matches Played", style = text_style)
+  valueBox(nb_match_df[1,'nb_match', drop=TRUE], icon = "fas fa-table-tennis", color="#00C5CD", caption)
+})
+```
+
+### {.value-box} 
+```{r}
+#Longest match duration in Minutes valueBox
+renderValueBox({
+  duration_matchs = duration(input$tournoi, atp)
+  max_duration = duration_matchs[which.max(duration_matchs$minutes),]
+  
+  caption = tags$p("Longest match duration in Minutes", style = text_style)
+  valueBox(max_duration$minutes, icon = "fas fa-stopwatch", color="#79CDCD", caption)
+})
+```
+
+### {.value-box} 
+```{r}
+#Shortest match duration in Minutes valueBox
+renderValueBox({
+  duration_matchs = duration(input$tournoi, atp)
+  min_duration = duration_matchs[which.min(duration_matchs$minutes),]
+
+  caption = tags$p("Shortest match duration in Minutes", style = text_style)
+  valueBox(min_duration$minutes, icon = "fas fa-stopwatch", color="#79CDCD", caption)
+})
+```
+
+### {.value-box}
+```{r}
+# Oldest player to win a final valueBox
+renderValueBox({
+  age=players_final_ages(atp, input$tournoi)
+  max_age_df = age[which.max(age$winner_age),]
+  
+  value = tags$p(paste(max_age_df$winner_age), style = "font-size: 110%;")
+  caption = div(
+           tags$p("Oldest player to win a final was", style = top_text_style), 
+           tags$h4(paste(max_age_df$winner_name), style = bottom_text_style))
+  valueBox(value, icon = "fa fa-trophy", color="#98F5FF", caption)
+})
+```
+### {.value-box}
+
+```{r}
+# Youngest player to win a final valueBox
+renderValueBox({
+  age=players_final_ages(atp, input$tournoi)
+  min_age_df = age[which.min(age$winner_age),]
+  
+  value = tags$p(paste(min_age_df$winner_age), style = "font-size: 110%;")
+  caption = div(
+       tags$p("Youngest player to win a final was", style = top_text_style), 
+       tags$h4(paste(min_age_df$winner_name), style = bottom_text_style))
+  valueBox(value, icon = "fa fa-trophy", color="#98F5FF", caption)
+})
+```
+## Column
+------
+### Players' contributions
+
+```{r}
+DT::renderDataTable({
+  carriere=player_info(atp, input$tournoi)
+  
+  DT::datatable(carriere,fillContainer=TRUE, class = "cell-border compact") 
+})
+```
+
+### Explore Top 10 players according to
+```{r fig.align='center', fig.height=5.5, fig.width=8}
+selectInput('explore',  '', c("Victories", "Aces"))# Retrieve the variable to explore: victories or aces
+#Top 10 players based on the explore input variable
+renderPlotly({
+  top_10_df=Top_10(atp, input$tournoi, input$explore)
+  
+  fig=top_10_winners_vis(top_10_df, input$explore, "#1c8f7a", "total descending", 'Rockwell', '#009966') 
+  fig <- fig %>% layout(autosize = F,width = 600, height = 420)
+
+
+  fig
+})
+```
+### Finals' ATP contributers' Ranks evolution 
+```{r fig.align='center', fig.height=5.5, fig.width=8}
+renderPlotly({
+  table=Atp_ranks(atp, input$tournoi)
+  
+  fig=evolution(table)
+  fig <- fig %>% layout(autosize = F,width = 660, height = 420)
+  fig
+})
+```
+## row 
+
+### Explore Top 5 Lowest and Highest Ranked Finals' winners
+```{r fig.align='center', fig.height=5.5, fig.width=5.5}
+
+selectInput('explore2',  '', c("Highest Ranked", "Lowest Ranked"))# Retrieve the variable to explore: victories or aces
+
+renderPlotly({
+  top_5_rank= Atp_ranks(atp, input$tournoi, input$explore2)  
+  fig=top_5_vis(top_5_rank, "#1c8f7a", "total ascending", 'Rockwell', '#009966')    
+
+  fig <- fig %>% layout(autosize = F,width = 400, height = 400)
+  fig
+    
+
+})
+```
+
+### Victories according to the winner's hand
+```{r}
+renderPlotly({
+  winner_hand_table <- victories_hand(atp, input$tournoi)
+    
+  colors = c("#00C5CD", "#458B74", "#7FFFD4")
+  fig <-  plot_ly(winner_hand_table, marker = list(colors = colors))
+  fig <- fig %>% add_pie(labels = ~winner_hand, values = ~count, hole = 0.5)
+  fig
+})
+```
+### Top 10 final appearances per country over the whole period
+```{r}
+  renderPlotly({
+  Both=most_final_appearances(atp, input$tournoi)
+  
+  fig=final_appearance(Both, "Country", "Appearances", "group",  "grey10", c("#87CEFA","#00C5CD"),'Rockwell', '#009966')
+  fig
+})
+```
+### Greatest Rivalry
+```{r}
+DT::renderDataTable({
+  most_freq_opposition=Restructure_Frequent_oppo(atp, input$tournoi )
+  
+  DT::datatable(most_freq_opposition,rownames = FALSE,fillContainer=FALSE, class = "cell-border compact", 
+                options = list(pageLength = 3, dom = "t"))%>%
+    formatStyle(1, target="row",backgroundColor =  styleEqual("Total rivalries","#008B8B")) %>%
+    formatStyle(1, target="row",backgroundColor =  styleEqual("Player 2 wins", "#79CDCD"))%>%
+    formatStyle(1, target="row",backgroundColor =  styleEqual("Player 1 wins" , "#97FFFF"))%>%
+    formatStyle(columns=2, color="#104E8B", fontWeight="bold")
+})
+```
+
+
+# ATP tour per year
+
+# Players' view
